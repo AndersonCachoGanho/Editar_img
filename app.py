@@ -53,70 +53,84 @@ if url_prod and arq_logo:
     b64_logo = convert_to_svg_clean(arq_logo)
 
     if b64_bg and b64_logo:
-       # --- Lógica de Geração do HTML (com alinhamento central) ---
-# Adicionamos uma div 'outer-container' que ocupa a largura total para centralizar o 'editor-box'
+      # ==============================================================================
+# --- DEFINIÇÃO DO HTML DO EDITOR (COM ALINHAMENTO CENTRAL CORRIGIDO) ---
+# ==============================================================================
+# Usamos Flexbox rigoroso e definimos larguras máximas idênticas para o Canvas e o Botão.
+# Isso garante que eles fiquem empilhados e centralizados perfeitamente na página.
 html_editor = f"""
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
 <style>
-    /* Reset de margens padrão para garantir controle total */
+    /* Reset total para garantir controle absoluto do layout */
     body {{
         margin: 0;
         padding: 0;
-        overflow: hidden; /* Evita barras de rolagem duplas */
+        overflow: hidden; /* Evita barras de rolagem duplas indesejadas */
+        background-color: transparent; /* Combina com o fundo do Streamlit */
     }}
 
-    /* Contêiner invisível que ocupa toda a largura disponível na página */
-    .outer-container {{
+    /* 1. CONTÊINER PRINCIPAL (Invisível, ocupa a largura total) */
+    .super-container {{
         width: 100%;
         display: flex;
-        justify-content: center; /* CENTRALIZAÇÃO HORIZONTAL PRINCIPAL */
-        padding-top: 10px;
+        justify-content: center; /* CENTRALIZAÇÃO HORIZONTAL CRÍTICA */
+        padding-top: 15px; /* Pequeno espaçamento do topo */
     }}
 
-    /* Caixa que contém o canvas e o botão, alinhada ao centro */
+    /* 2. CAIXA DO EDITOR (Envolve o Canvas e o Botão) */
     .editor-box {{
-        width: 100%;
-        max-width: 700px; /* Largura máxima do canvas */
-        text-align: center; /* Centraliza o botão e o canvas dentro da caixa */
+        width: 700px; /* Largura fixa idêntica à largura do Canvas */
+        max-width: 100%; /* Garante responsividade em telas menores */
         display: flex;
-        flex-direction: column;
-        align-items: center;
+        flex-direction: column; /* Empilha Canvas sobre o Botão */
+        align-items: center; /* Centraliza itens dentro da caixa */
+        text-align: center;
     }}
 
-    /* Estilo do Canvas */
-    #canvas {{
+    /* 3. ESTILO DO CANVAS */
+    #canvas-container {{
         border: 1px solid #ccc;
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        max-width: 100%; /* Torna o canvas responsivo */
+        background-color: white; /* Fundo branco para o produto */
+        overflow: hidden; /* Mantém a borda arredondada */
     }}
 
-    /* Estilo do Botão (Alinhado e com mesma largura do canvas) */
+    /* 4. ESTILO DO BOTÃO (Agora perfeitamente alinhado) */
     #btnSave {{
-        margin-top: 20px;
-        padding: 12px 24px;
-        background-color: #28a745;
+        margin-top: 25px; /* Espaço entre o produto e o botão */
+        margin-bottom: 25px; /* Espaço inferior */
+        padding: 14px 28px;
+        background-color: #28a745; /* Verde Sucesso */
         color: white;
         border: none;
-        border-radius: 6px;
+        border-radius: 8px;
         cursor: pointer;
-        font-family: sans-serif;
+        font-family: 'Source Sans Pro', sans-serif; /* Fonte padrão do Streamlit */
         font-weight: bold;
         font-size: 16px;
-        width: 100%; /* Ocupa a mesma largura da .editor-box */
-        max-width: 700px; /* Garante que não passe da largura do canvas */
-        transition: background-color 0.2s;
+        width: 100%; /* Ocupa TODA a largura da .editor-box (700px) */
+        max-width: 700px; /* Garante alinhamento perfeito com o canvas */
+        transition: background-color 0.2s, transform 0.1s;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }}
 
     #btnSave:hover {{
         background-color: #218838;
     }}
+
+    #btnSave:active {{
+        transform: translateY(1px); /* Efeito de clique */
+    }}
 </style>
 
-<div class="outer-container">
+<div class="super-container">
     <div class="editor-box">
-        <canvas id="canvas"></canvas>
+        
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
         
         <button id="btnSave">
             💾 BAIXAR JPEG FINAL
@@ -125,15 +139,18 @@ html_editor = f"""
 </div>
 
 <script>
-    const canvas = new fabric.Canvas('canvas');
-    const activeColor = "{cor_logo}";
-    const storageKey = "brinde_pos_data";
+    // Inicialização do Canvas Fabric.js
+    const canvas = new fabric.Canvas('canvas', {{
+        preserveObjectStacking: true // Mantém a ordem dos objetos
+    }});
+    const activeColor = "{cor_logo}"; // Cor vinda do Streamlit
+    const storageKey = "brinde_pos_data"; // Chave para o LocalStorage
 
-    // 1. Carregar Fundo (com tratamento de responsividade)
+    // 1. Carregar Imagem de Fundo (Produto)
     fabric.Image.fromURL('data:image/png;base64,{b64_bg}', function(img) {{
-        // Define a largura máxima com base na largura da janela, mas sem passar de 700px
+        // Define a largura máxima do canvas para 700px, ajustando a altura proporcionalmente
         const maxDisplayWidth = 700;
-        const currentWindowWidth = window.innerWidth - 40; // Desconto para margens
+        const currentWindowWidth = window.innerWidth - 30; // Margem de segurança
         const canvasWidth = Math.min(currentWindowWidth, maxDisplayWidth);
         
         const scale = canvasWidth / img.width;
@@ -141,57 +158,115 @@ html_editor = f"""
         canvas.setWidth(canvasWidth);
         canvas.setHeight(img.height * scale);
         
+        // Define a imagem como fundo, não selecionável e não editável
         img.set({{
             scaleX: scale,
             scaleY: scale,
             selectable: false,
-            evented: false
+            evented: false,
+            originX: 'left',
+            originY: 'top'
         }});
         canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
     }});
 
-    // 2. Carregar Logo (com LocalStorage)
+    // 2. Carregar e Colorir Logo (com persistência LocalStorage)
     fabric.loadSVGFromString(atob('{b64_logo}'), function(objects, options) {{
         const logo = fabric.util.groupSVGElements(objects, options);
-        logo.getObjects().forEach(obj => {{ obj.set({{ fill: activeColor, stroke: activeColor }}); }});
+        
+        // Aplica a cor escolhida em todos os caminhos do vetor
+        logo.getObjects().forEach(obj => {{ 
+            obj.set({{ fill: activeColor, stroke: activeColor }}); 
+        }});
 
+        // Tenta recuperar a posição salva no navegador
         const savedPos = JSON.parse(localStorage.getItem(storageKey));
+        
         if (savedPos) {{
+            // Restaura posição, escala e rotação salvos
             logo.set({{
-                left: savedPos.left, top: savedPos.top, 
-                scaleX: savedPos.scaleX, scaleY: savedPos.scaleY, 
+                left: savedPos.left, 
+                top: savedPos.top, 
+                scaleX: savedPos.scaleX, 
+                scaleY: savedPos.scaleY, 
                 angle: savedPos.angle
             }});
-        }} else {{
-            // Posição inicial centralizada
-            logo.set({{ left: 350, top: 250, scaleX: 0.2, scaleY: 0.2 }});
+        } else {{
+            // Posição inicial centralizada (considerando 700px de largura)
+            logo.set({{ 
+                left: 350, 
+                top: 250, 
+                scaleX: 0.2, 
+                scaleY: 0.2,
+                originX: 'center',
+                originY: 'center'
+            }});
         }}
 
-        logo.set({{ cornerColor: '#007bff', cornerSize: 12, transparentCorners: false }});
+        // Estilização dos controles de manipulação (alças brancas com borda azul)
+        logo.set({{
+            cornerColor: 'white',
+            cornerStrokeColor: '#007bff',
+            cornerSize: 12,
+            transparentCorners: false,
+            borderColor: '#007bff',
+            hasRotatingPoint: true,
+            rotatingPointOffset: 40
+        }});
+
         canvas.add(logo);
         canvas.setActiveObject(logo);
         canvas.renderAll();
 
+        // FUNÇÃO DE SALVAMENTO AUTOMÁTICO (Debounced para performance)
+        let saveTimeout;
         const savePos = () => {{
-            const data = {{ left: logo.left, top: logo.top, scaleX: logo.scaleX, scaleY: logo.scaleY, angle: logo.angle }};
-            localStorage.setItem(storageKey, JSON.stringify(data));
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {{
+                const data = {{
+                    left: logo.left,
+                    top: logo.top,
+                    scaleX: logo.scaleX,
+                    scaleY: logo.scaleY,
+                    angle: logo.angle
+                }};
+                localStorage.setItem(storageKey, JSON.stringify(data));
+            }}, 100); // Salva 100ms após o último movimento
         }};
+
+        // Escuta eventos de modificação e movimento para salvar a posição
         logo.on('modified', savePos);
         logo.on('moving', savePos);
     }});
 
-    // 3. Função de Download (Ajustada para o novo alinhamento)
+    // 3. Função de Download (Ajustada para o novo layout)
     document.getElementById('btnSave').addEventListener('click', function() {{
+        // Remove a seleção para que as alças não apareçam na imagem final
         canvas.discardActiveObject().renderAll();
-        // Aumenta a resolução para download nítido
-        const dataURL = canvas.toDataURL({{ format: 'jpeg', quality: 0.9, multiplier: 2 }});
+        
+        // Gera o DataURL do canvas como JPEG de alta qualidade
+        // multiplier: 2 dobra a resolução para um download nítido (1400px de largura)
+        const dataURL = canvas.toDataURL({{ 
+            format: 'jpeg', 
+            quality: 0.9, 
+            multiplier: 2 
+        }});
+        
+        // Cria um link invisível para forçar o download
         const link = document.createElement('a');
-        link.download = 'simulacao.jpg';
+        link.download = 'simulacao_brinde.jpg';
         link.href = dataURL;
         link.click();
     }});
 </script>
 """
+
+# ==============================================================================
+# --- CHAMADA DO COMPONENTE NO STREAMLIT (COM AJUSTES DE LARGURA) ---
+# ==============================================================================
+# É CRUCIAL não definir uma largura fixa aqui (width=...).
+# O Streamlit tentará ocupar o máximo de espaço, e nosso CSS interno fará a centralização.
+st.components.v1.html(html_editor, height=900, scrolling=False)
 
 # --- Chamada do Componente no Streamlit ---
 # USAMOS 'use_container_width=True' PARA OCUPAR A PÁGINA INTEIRA
